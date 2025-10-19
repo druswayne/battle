@@ -529,7 +529,7 @@ def admin_setup():
     
     return render_template('admin_setup.html')
 
-# if __name__ == '__main__':
-#     with app.app_context():
-#         db.create_all()
-#     app.run(debug=False)
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    app.run(debug=False)
