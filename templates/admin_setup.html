@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Настройка администратора - Турнирная система{% endblock %}
+
+{% block content %}
+<style>
+    .setup-card {
+        border: 3px solid transparent !important;
+        background: linear-gradient(white, white) padding-box, 
+                    linear-gradient(135deg, #11998e 0%, #38ef7d 100%) border-box !important;
+        box-shadow: 0 10px 40px rgba(17, 153, 142, 0.3) !important;
+        animation: fadeInUp 0.6s ease;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .setup-icon {
+        font-size: 3rem;
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: rotate 4s linear infinite;
+    }
+    
+    @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card setup-card">
+            <div class="card-header text-center" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;">
+                <div class="setup-icon mb-2" style="-webkit-text-fill-color: white !important;">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <h4 style="color: white;">Настройка администратора</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Первоначальная настройка</strong><br>
+                    Создайте первого администратора для доступа к админ-панели
+                </div>
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">
+                            <i class="fas fa-user"></i> Имя пользователя
+                        </label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                        <div class="form-text">Выберите уникальное имя пользователя</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            <i class="fas fa-lock"></i> Пароль
+                        </label>
+                        <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                        <div class="form-text">Минимум 6 символов</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">
+                            <i class="fas fa-lock"></i> Подтвердите пароль
+                        </label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="6">
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-user-plus"></i> Создать администратора
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer text-center">
+                <small class="text-muted">
+                    Уже есть аккаунт? 
+                    <a href="{{ url_for('admin_login') }}" class="text-decoration-none">
+                        Войти в систему
+                    </a>
+                </small>
+            </div>
+        </div>
+        
+        <div class="text-center mt-3">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Назад на главную
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+// Проверка совпадения паролей
+document.addEventListener('DOMContentLoaded', function() {
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    
+    function validatePassword() {
+        if (password.value !== confirmPassword.value) {
+            confirmPassword.setCustomValidity('Пароли не совпадают');
+        } else {
+            confirmPassword.setCustomValidity('');
+        }
+    }
+    
+    password.addEventListener('change', validatePassword);
+    confirmPassword.addEventListener('keyup', validatePassword);
+});
+</script>
+{% endblock %}

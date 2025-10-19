@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tournament.name }} - Турнирная система{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+            <h1 class="mb-0">
+                <i class="fas fa-trophy text-warning"></i> {{ tournament.name }}
+            </h1>
+            <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-md-auto">
+                {% if session.admin_logged_in %}
+                    <a href="{{ url_for('admin') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> <span class="d-none d-sm-inline">Назад к админ панели</span><span class="d-inline d-sm-none">Назад</span>
+                    </a>
+                    <button type="button" class="btn btn-danger" 
+                            data-bs-toggle="modal" data-bs-target="#deleteTournamentModal">
+                        <i class="fas fa-trash"></i> <span class="d-none d-sm-inline">Удалить турнир</span><span class="d-inline d-sm-none">Удалить</span>
+                    </button>
+                {% else %}
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary w-100">
+                        <i class="fas fa-arrow-left"></i> Назад на главную
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="alert alert-{{ 'success' if tournament.status == 'completed' else 'info' }}">
+            <i class="fas fa-{{ 'trophy' if tournament.status == 'completed' else 'info-circle' }}"></i> 
+            Статус турнира: 
+            <span class="badge bg-{{ 'success' if tournament.status == 'completed' else 'primary' }}">
+                {{ 'Завершен' if tournament.status == 'completed' else 'Активен' }}
+            </span>
+            | Участников: {{ tournament.participants|length }}
+            
+            {% if tournament.status == 'completed' %}
+                {% set final_winner = tournament.matches|selectattr('is_completed')|selectattr('round_number', 'equalto', rounds.keys()|list|max)|first %}
+                {% if final_winner and final_winner.winner %}
+                    <br>
+                    <i class="fas fa-crown text-warning"></i>
+                    <strong>🏆 ПОБЕДИТЕЛЬ ТУРНИРА: {{ final_winner.winner.name }}! 🏆</strong>
+                {% endif %}
+            {% elif not session.admin_logged_in %}
+                <br>
+                <i class="fas fa-shield-alt text-warning"></i> 
+                <strong>Только для просмотра:</strong> Для управления турниром необходимо войти в систему как администратор
+            {% endif %}
+        </div>
+        
+        <!-- Турнирная сетка -->
+        <div class="bracket-container">
+            <div class="scroll-indicator d-md-none">
+                <div class="scroll-progress"></div>
+            </div>
+            <div class="tournament-bracket">
+            {% for round_num, matches in rounds.items() %}
+            <div class="round">
+                <div class="round-title">
+                    {{ round_names[round_num] }}
+                </div>
+                <div class="round-rules">
+                    {% set total_rounds = rounds.keys()|list|max %}
+                    {% if round_num == total_rounds %}
+                        <i class="fas fa-trophy"></i> До 3 побед
+                    {% elif round_num == total_rounds - 1 or round_num == total_rounds - 2 %}
+                        <i class="fas fa-medal"></i> До 2 побед
+                    {% else %}
+                        <i class="fas fa-fire"></i> До 1 победы
+                    {% endif %}
+                </div>
+                
+                {% for match in matches %}
+                <div class="match {% if match.is_completed %}completed{% endif %}">
+                    {% if match.round_number > 1 %}
+                        <div class="connection-line"></div>
+                    {% endif %}
+                    
+                    <div class="match-info">
+                        {% if match.player1 %}
+                            <div class="player {% if match.winner_id == match.player1_id %}winner{% elif match.is_completed and match.winner_id != match.player1_id %}loser{% endif %}">
+                                {{ match.player1.name }}
+                            </div>
+                        {% elif match.player1_id %}
+                            <div class="player">
+                                Игрок ID: {{ match.player1_id }}
+                            </div>
+                        {% else %}
+                            <div class="player" style="color: #495057; font-weight: 600;">TBD</div>
+                        {% endif %}
+                        
+                        <div class="vs-text text-muted">VS</div>
+                        
+                        {% if match.player2 %}
+                            <div class="player {% if match.winner_id == match.player2_id %}winner{% elif match.is_completed and match.winner_id != match.player2_id %}loser{% endif %}">
+                                {{ match.player2.name }}
+                            </div>
+                        {% elif match.player2_id %}
+                            <div class="player">
+                                Игрок ID: {{ match.player2_id }}
+                            </div>
+                        {% else %}
+                            <div class="player" style="color: #495057; font-weight: 600;">TBD</div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if not match.is_completed and match.player1 and match.player2 %}
+                        {% if session.admin_logged_in %}
+                            <div class="winner-selection mt-2">
+                                <form method="POST" action="{{ url_for('set_winner') }}" class="d-inline">
+                                    <input type="hidden" name="match_id" value="{{ match.id }}">
+                                    <div class="btn-group-vertical">
+                                        <button type="submit" name="winner_id" value="{{ match.player1_id }}" 
+                                                class="winner-button">
+                                            <i class="fas fa-crown"></i> {{ match.player1.name }}
+                                        </button>
+                                        <button type="submit" name="winner_id" value="{{ match.player2_id }}" 
+                                                class="winner-button">
+                                            <i class="fas fa-crown"></i> {{ match.player2.name }}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        {% else %}
+                            <div class="match-pending mt-2">
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-clock"></i> <span class="d-none d-sm-inline">Ожидает определения победителя</span><span class="d-inline d-sm-none">Ожидание</span>
+                                </span>
+                                <div class="mt-1">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> 
+                                        <span class="d-none d-sm-inline">Только администратор может выбрать победителя</span>
+                                        <span class="d-inline d-sm-none">Только для админа</span>
+                                    </small>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% elif match.is_completed %}
+                        <div class="winner-info mt-2">
+                            <span class="badge bg-success">
+                                <i class="fas fa-trophy"></i> <span class="d-none d-sm-inline">Победитель:</span> {{ match.winner.name }}
+                            </span>
+                            {% if match.round_number < rounds.keys()|list|max %}
+                                <div class="mt-1">
+                                    <small class="text-success">
+                                        <i class="fas fa-arrow-up"></i> <span class="d-none d-sm-inline">Перешел в следующий раунд</span><span class="d-inline d-sm-none">Далее</span>
+                                    </small>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+        </div>
+        
+        <!-- Информация о турнире -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-bar"></i> Статистика турнира</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p><strong>Всего участников:</strong> {{ tournament.participants|length }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Всего раундов:</strong> {{ rounds.keys()|list|max if rounds else 0 }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Всего матчей:</strong> {{ tournament.matches|length }}</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>Завершенных матчей:</strong> {{ tournament.matches|selectattr('is_completed')|list|length }}</p>
+                            </div>
+                        </div>
+                        
+                        {% set winner = tournament.matches|selectattr('is_completed')|selectattr('round_number', 'equalto', rounds.keys()|list|max)|first %}
+                        {% if winner and winner.winner %}
+                        <hr>
+                        <div class="text-center">
+                            <h4 class="text-success">
+                                <i class="fas fa-trophy"></i> Победитель турнира!
+                            </h4>
+                            <h3 class="text-warning">{{ winner.winner.name }}</h3>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Автообновление страницы каждые 30 секунд для отображения изменений
+setInterval(function() {
+    // Проверяем, есть ли незавершенные матчи
+    const incompleteMatches = document.querySelectorAll('.match:not(.completed)');
+    if (incompleteMatches.length > 0) {
+        // Можно добавить уведомление о необходимости обновления
+        console.log('Есть незавершенные матчи');
+    }
+}, 30000);
+
+// Индикатор прогресса прокрутки для турнирной сетки
+document.addEventListener('DOMContentLoaded', function() {
+    const bracket = document.querySelector('.tournament-bracket');
+    const scrollProgress = document.querySelector('.scroll-progress');
+    
+    if (bracket && scrollProgress) {
+        bracket.addEventListener('scroll', function() {
+            const scrollLeft = bracket.scrollLeft;
+            const scrollWidth = bracket.scrollWidth - bracket.clientWidth;
+            const scrollPercentage = (scrollLeft / scrollWidth) * 100;
+            scrollProgress.style.width = scrollPercentage + '%';
+        });
+        
+        // Инициализация при загрузке
+        const scrollWidth = bracket.scrollWidth - bracket.clientWidth;
+        if (scrollWidth > 0) {
+            scrollProgress.style.width = '0%';
+        } else {
+            // Если прокрутка не нужна, скрываем индикатор
+            const indicator = document.querySelector('.scroll-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        }
+    }
+});
+</script>
+
+<!-- Модальное окно для удаления турнира -->
+{% if session.admin_logged_in %}
+<div class="modal fade" id="deleteTournamentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Удаление турнира
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-warning"></i>
+                    <strong>ВНИМАНИЕ!</strong><br>
+                    Вы собираетесь удалить турнир <strong>"{{ tournament.name }}"</strong>.
+                </div>
+                
+                <p>Это действие удалит:</p>
+                <ul>
+                    <li>Все матчи турнира ({{ tournament.matches|length }})</li>
+                    <li>Все участия в турнире ({{ tournament.participants|length }})</li>
+                    <li>Сам турнир</li>
+                </ul>
+                
+                <p class="text-danger"><strong>Эта операция необратима!</strong></p>
+                
+                <form method="POST" action="{{ url_for('delete_tournament', tournament_id=tournament.id) }}">
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> Отмена
+                        </button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Удалить турнир
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

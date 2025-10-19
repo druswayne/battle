@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Админ панель - Турнирная система{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-cog text-primary"></i> Админ панель
+            <small class="text-muted">- Добро пожаловать, {{ session.admin_username }}!</small>
+        </h1>
+        
+        <!-- Управление пользователями -->
+        <div class="admin-panel">
+            <h3><i class="fas fa-users"></i> Управление участниками</h3>
+            
+            <!-- Добавление нового пользователя -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <form method="POST" action="{{ url_for('add_user') }}">
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="name" 
+                                   placeholder="Имя участника или несколько через запятую" required>
+                            <button class="btn btn-success" type="submit">
+                                <i class="fas fa-plus"></i> Добавить
+                            </button>
+                        </div>
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i> Можно добавить несколько участников сразу, разделяя их запятой. Например: Иван, Петр, Сидор
+                        </small>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Список пользователей -->
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Список участников ({{ users|length }})</h5>
+                    <div class="user-list">
+                        {% if users %}
+                            {% for user in users %}
+                            <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
+                                <div>
+                                    <span>
+                                        <i class="fas fa-user"></i> {{ user.name }}
+                                    </span>
+                                    {% if user.tournament_participations %}
+                                        <br><small class="text-muted">
+                                            Участвует в {{ user.tournament_participations|length }} турнире(ах)
+                                        </small>
+                                    {% endif %}
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" 
+                                          style="display: inline;">
+                                        <button type="submit" class="btn btn-sm btn-danger" 
+                                                onclick="return confirm('Удалить участника?')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% if user.tournament_participations %}
+                                        <button type="button" class="btn btn-sm btn-warning" 
+                                                data-bs-toggle="modal" data-bs-target="#forceDeleteModal{{ user.id }}">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> Нет добавленных участников
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <h5>Создание турнира</h5>
+                    {% if users|length >= 2 %}
+                        <form method="POST" action="{{ url_for('create_tournament') }}">
+                            <div class="mb-3">
+                                <label for="tournament_name" class="form-label">Название турнира</label>
+                                <input type="text" class="form-control" id="tournament_name" 
+                                       name="tournament_name" value="Турнир" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Выберите участников (минимум 2):</label>
+                                <div class="mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllParticipants()">
+                                        <i class="fas fa-check-square"></i> Выбрать всех
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectNoneParticipants()">
+                                        <i class="fas fa-square"></i> Снять выбор
+                                    </button>
+                                </div>
+                                <div class="user-list border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                    {% for user in users %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="selected_users" value="{{ user.id }}" 
+                                               id="user_{{ user.id }}">
+                                        <label class="form-check-label" for="user_{{ user.id }}">
+                                            {{ user.name }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-trophy"></i> Создать турнир
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            Для создания турнира нужно минимум 2 участника
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Список турниров -->
+        <div class="mt-4">
+            <h3><i class="fas fa-list"></i> Список турниров</h3>
+            {% if tournaments %}
+                <div class="row">
+                    {% for tournament in tournaments %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-trophy text-warning"></i> {{ tournament.name }}
+                                </h5>
+                                <p class="card-text">
+                                    <small class="text-muted">
+                                        Создан: {{ tournament.created_at.strftime('%d.%m.%Y %H:%M') }}
+                                    </small>
+                                </p>
+                                <p class="card-text">
+                                    Статус: 
+                                    <span class="badge bg-{{ 'success' if tournament.status == 'completed' else 'primary' }}">
+                                        {{ 'Завершен' if tournament.status == 'completed' else 'Активен' }}
+                                    </span>
+                                </p>
+                                <p class="card-text">
+                                    Участников: {{ tournament.participants|length }}
+                                </p>
+                                <div class="btn-group w-100" role="group">
+                                    <a href="{{ url_for('tournament_view', tournament_id=tournament.id) }}" 
+                                       class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye"></i> Управление
+                                    </a>
+                                    <button type="button" class="btn btn-danger btn-sm" 
+                                            data-bs-toggle="modal" data-bs-target="#deleteTournamentModal{{ tournament.id }}">
+                                        <i class="fas fa-trash"></i> Удалить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Пока нет созданных турниров
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// Выбор всех участников для турнира
+function selectAllParticipants() {
+    const checkboxes = document.querySelectorAll('input[name="selected_users"]');
+    checkboxes.forEach(checkbox => checkbox.checked = true);
+}
+
+// Снятие выбора со всех участников
+function selectNoneParticipants() {
+    const checkboxes = document.querySelectorAll('input[name="selected_users"]');
+    checkboxes.forEach(checkbox => checkbox.checked = false);
+}
+</script>
+
+<!-- Модальные окна для принудительного удаления -->
+{% for user in users %}
+    {% if user.tournament_participations %}
+    <div class="modal fade" id="forceDeleteModal{{ user.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exclamation-triangle"></i> Принудительное удаление
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-warning"></i>
+                        <strong>ВНИМАНИЕ!</strong><br>
+                        Пользователь <strong>{{ user.name }}</strong> участвует в турнирах. 
+                        Принудительное удаление удалит:
+                        <ul>
+                            <li>Участие в турнирах</li>
+                            <li>Все матчи с участием этого пользователя</li>
+                            <li>Самого пользователя</li>
+                        </ul>
+                        <strong>Эта операция необратима!</strong>
+                    </div>
+                    <form method="POST" action="{{ url_for('force_delete_user', user_id=user.id) }}">
+                        <div class="mb-3">
+                            <label for="confirm{{ user.id }}" class="form-label">
+                                Для подтверждения введите: <code>DELETE_USER</code>
+                            </label>
+                            <input type="text" class="form-control" id="confirm{{ user.id }}" name="confirm" required>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                Отмена
+                            </button>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Принудительно удалить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
+
+<!-- Модальные окна для удаления турниров -->
+{% for tournament in tournaments %}
+<div class="modal fade" id="deleteTournamentModal{{ tournament.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Удаление турнира
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-warning"></i>
+                    <strong>ВНИМАНИЕ!</strong><br>
+                    Вы собираетесь удалить турнир <strong>"{{ tournament.name }}"</strong>.
+                </div>
+                
+                <p>Это действие удалит:</p>
+                <ul>
+                    <li>Все матчи турнира ({{ tournament.matches|length }})</li>
+                    <li>Все участия в турнире ({{ tournament.participants|length }})</li>
+                    <li>Сам турнир</li>
+                </ul>
+                
+                <p class="text-danger"><strong>Эта операция необратима!</strong></p>
+                
+                <form method="POST" action="{{ url_for('delete_tournament', tournament_id=tournament.id) }}">
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> Отмена
+                        </button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Удалить турнир
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
