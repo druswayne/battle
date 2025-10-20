@@ -18,6 +18,7 @@ db = SQLAlchemy(app)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    tag = db.Column(db.String(50), nullable=True)  # Метка для группировки участников
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Tournament(db.Model):
@@ -82,12 +83,19 @@ def index():
 def admin():
     users = User.query.order_by(User.name).all()
     tournaments = Tournament.query.order_by(Tournament.created_at.desc()).all()
-    return render_template('admin.html', users=users, tournaments=tournaments)
+    
+    # Получаем уникальные метки для фильтрации
+    tags = db.session.query(User.tag).distinct().filter(User.tag.isnot(None), User.tag != '').all()
+    unique_tags = sorted([tag[0] for tag in tags])
+    
+    return render_template('admin.html', users=users, tournaments=tournaments, tags=unique_tags)
 
 @app.route('/add_user', methods=['POST'])
 @admin_required
 def add_user():
     names_input = request.form.get('name')
+    tag = request.form.get('tag', '').strip()  # Получаем метку
+    
     if names_input:
         # Разделяем по запятой и очищаем от пробелов
         names = [name.strip() for name in names_input.split(',') if name.strip()]
@@ -106,7 +114,7 @@ def add_user():
                 duplicate_count += 1
                 continue
             
-            user = User(name=name)
+            user = User(name=name, tag=tag if tag else None)
             db.session.add(user)
             added_count += 1
         

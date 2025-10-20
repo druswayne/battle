@@ -18,15 +18,23 @@
             <div class="row mb-4">
                 <div class="col-md-6">
                     <form method="POST" action="{{ url_for('add_user') }}">
-                        <div class="input-group">
+                        <div class="mb-2">
                             <input type="text" class="form-control" name="name" 
                                    placeholder="Имя участника или несколько через запятую" required>
+                        </div>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" name="tag" 
+                                   placeholder="Метка (необязательно)">
                             <button class="btn btn-success" type="submit">
                                 <i class="fas fa-plus"></i> Добавить
                             </button>
                         </div>
                         <small class="text-muted">
                             <i class="fas fa-info-circle"></i> Можно добавить несколько участников сразу, разделяя их запятой. Например: Иван, Петр, Сидор
+                        </small>
+                        <br>
+                        <small class="text-muted">
+                            <i class="fas fa-tag"></i> Метка используется для группировки участников при создании турнира (например: Группа А, Группа Б, Новички, Профи)
                         </small>
                     </form>
                 </div>
@@ -43,6 +51,11 @@
                                 <div>
                                     <span>
                                         <i class="fas fa-user"></i> {{ user.name }}
+                                        {% if user.tag %}
+                                            <span class="badge bg-info ms-1">
+                                                <i class="fas fa-tag"></i> {{ user.tag }}
+                                            </span>
+                                        {% endif %}
                                     </span>
                                     {% if user.tournament_participations %}
                                         <br><small class="text-muted">
@@ -95,14 +108,35 @@
                                         <i class="fas fa-square"></i> Снять выбор
                                     </button>
                                 </div>
-                                <div class="user-list border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                
+                                {% if tags %}
+                                <div class="mb-2">
+                                    <label class="form-label">
+                                        <i class="fas fa-filter"></i> Фильтр по меткам:
+                                    </label>
+                                    <select class="form-select form-select-sm" id="tagFilter" onchange="filterByTag()">
+                                        <option value="">Все участники</option>
+                                        <option value="no-tag">Без метки</option>
+                                        {% for tag in tags %}
+                                        <option value="{{ tag }}">{{ tag }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endif %}
+                                
+                                <div class="user-list border rounded p-2" style="max-height: 200px; overflow-y: auto;" id="participantsList">
                                     {% for user in users %}
-                                    <div class="form-check">
+                                    <div class="form-check participant-item" data-tag="{{ user.tag if user.tag else 'no-tag' }}">
                                         <input class="form-check-input" type="checkbox" 
                                                name="selected_users" value="{{ user.id }}" 
                                                id="user_{{ user.id }}">
                                         <label class="form-check-label" for="user_{{ user.id }}">
                                             {{ user.name }}
+                                            {% if user.tag %}
+                                                <span class="badge bg-info" style="font-size: 0.7em;">
+                                                    <i class="fas fa-tag"></i> {{ user.tag }}
+                                                </span>
+                                            {% endif %}
                                         </label>
                                     </div>
                                     {% endfor %}
@@ -176,14 +210,40 @@
 <script>
 // Выбор всех участников для турнира
 function selectAllParticipants() {
-    const checkboxes = document.querySelectorAll('input[name="selected_users"]');
-    checkboxes.forEach(checkbox => checkbox.checked = true);
+    const checkboxes = document.querySelectorAll('input[name="selected_users"]:not([style*="display: none"])');
+    checkboxes.forEach(checkbox => {
+        const participantItem = checkbox.closest('.participant-item');
+        if (participantItem && participantItem.style.display !== 'none') {
+            checkbox.checked = true;
+        }
+    });
 }
 
 // Снятие выбора со всех участников
 function selectNoneParticipants() {
     const checkboxes = document.querySelectorAll('input[name="selected_users"]');
     checkboxes.forEach(checkbox => checkbox.checked = false);
+}
+
+// Фильтрация участников по метке
+function filterByTag() {
+    const selectedTag = document.getElementById('tagFilter').value;
+    const participants = document.querySelectorAll('.participant-item');
+    
+    participants.forEach(participant => {
+        const participantTag = participant.getAttribute('data-tag');
+        
+        if (selectedTag === '') {
+            // Показать всех
+            participant.style.display = '';
+        } else if (selectedTag === 'no-tag') {
+            // Показать только без метки
+            participant.style.display = participantTag === 'no-tag' ? '' : 'none';
+        } else {
+            // Показать только с выбранной меткой
+            participant.style.display = participantTag === selectedTag ? '' : 'none';
+        }
+    });
 }
 </script>
 
