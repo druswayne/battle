@@ -420,12 +420,24 @@ def create_next_round_match(current_match):
             round_number=next_round
         ).all()
         
-        # Проверяем, есть ли матчи с None значениями и удаляем их
-        invalid_matches = [match for match in existing_next_round_matches if match.player1_id is None or match.player2_id is None]
+        # Проверяем, есть ли некорректные матчи и удаляем их
+        # Корректными считаются: полноценные пары (оба игрока заданы)
+        # а также бай-матчи (player2_id=None, winner_id==player1_id, is_completed=True)
+        invalid_matches = []
+        for nm in existing_next_round_matches:
+            is_full_pair = nm.player1_id is not None and nm.player2_id is not None
+            is_valid_bye = (
+                nm.player1_id is not None and
+                nm.player2_id is None and
+                nm.winner_id == nm.player1_id and
+                nm.is_completed is True
+            )
+            if not (is_full_pair or is_valid_bye):
+                invalid_matches.append(nm)
         if invalid_matches:
             for invalid_match in invalid_matches:
                 db.session.delete(invalid_match)
-            existing_next_round_matches = [match for match in existing_next_round_matches if match.player1_id is not None and match.player2_id is not None]
+            existing_next_round_matches = [m for m in existing_next_round_matches if m not in invalid_matches]
         
         # Если матчей следующего раунда еще нет, создаем их
         if len(existing_next_round_matches) == 0:
@@ -434,19 +446,25 @@ def create_next_round_match(current_match):
                 player1_id = winners[i]
                 player2_id = winners[i + 1] if i + 1 < len(winners) else None
                 
-                # Если только один игрок (нечетное количество), он автоматически выигрывает турнир
+                # Если нечетное число победителей, создаем бай-матч:
+                # один участник автоматически проходит дальше и матч отображается в сетке
                 if player2_id is None:
-                    # Обновляем статус турнира на завершенный
-                    if tournament:
-                        tournament.status = 'completed'
-                    return  # Не создаем матч, турнир завершен
+                    bye_match = Match(
+                        tournament_id=tournament_id,
+                        round_number=next_round,
+                        player1_id=player1_id,
+                        player2_id=None,
+                        winner_id=player1_id,
+                        is_completed=True
+                    )
+                    db.session.add(bye_match)
                 else:
                     new_match = Match(
                         tournament_id=tournament_id,
                         round_number=next_round,
                         player1_id=player1_id,
                         player2_id=player2_id,
-                        is_completed=False  # Новые матчи не завершены
+                        is_completed=False
                     )
                     db.session.add(new_match)
 
@@ -540,4 +558,4 @@ def admin_setup():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=False)
+    app.run(debug=True)
